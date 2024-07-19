@@ -1,0 +1,70 @@
+name: Run-PowerShell-Script
+on:
+  #schedule:
+    # Cron expression for every 24 hours at 4:00 AM
+     #- cron: '0 4 * * *'
+  workflow_dispatch: # MANUAL TRIGGER
+    inputs: # INPUTS FOR MANUAL TRIGGER
+      INPUT1: # NAME OF INPUT
+        description: >
+          THIS IS AN INPUT DESCRIPTION
+        required: true # OR FALSE
+        type: choice # OR STRING, BOOLEAN, NUMBER
+        default: 'Add' # DEFAULT WILL AUTOFILL THE CHOICE - IS OPTIONAL
+        options:
+          - OPTION1
+          - OPTION2 # ADD MORE OPTIONS AS NEEDED
+      INPUT2:
+        description: >
+          THIS IS AN INPUT DESCRIPTION
+        required: false # OR TRUE
+        type: string # OR BOOLEAN, NUMBER, CHOICE
+
+defaults:
+  run:
+    shell: powershell # CAN ALSO USE PWSH IF v7+ IS NEEDED
+
+jobs:
+  PowerShell-Script:
+    runs-on: [self-hosted, X64, Windows] # FOR INTERNAL JOBS MUST USE SELF-HOSTED TO BE IN CORRECT ENVIRONMENT
+    
+    steps:
+      - name: Check out repository # CHECKS OUT THE REPOSITORY
+        uses: actions/checkout@v4
+      
+      - name: Execute custom Powershell script # RUNS THE POWERSHELL SCRIPT
+        env: # INITIALIZER FUNCTION SUPPORTS UP TO SEVEN PARAMETER INPUTS
+          Var1: "INPUT1" # These are simple example inputs. In some scripts you will not need these at all or only a few
+          Value1: ${{ github.event.inputs.INPUT1 }}
+          Var2: "INPUT2" # remember that these are created in the inputs section
+          Value2: ${{ github.event.inputs.INPUT2 }}
+          Var3: "INPUT3"
+          Value3: ${{ github.event.inputs.INPUT3 }}
+          Var4: "INPUT4"
+          Value4: ${{ github.event.inputs.INPUT4 }}
+          Var5: "INPUT5"
+          Value5: ${{ github.event.inputs.INPUT5 }}
+          Var6: "INPUT6"
+          Value6: ${{ github.event.inputs.INPUT6 }}
+          Var7: "INPUT7"
+          Value7: ${{ github.event.inputs.INPUT7 }}
+          # Credentials are required for almost all scripts, set these in the github repository secrets
+          SERVICENOW_CREDS_USR: ${{ secrets.SERVICENOW_CREDS_USR }}
+          SERVICENOW_CREDS_PSW: ${{ secrets.SERVICENOW_CREDS_PSW }}
+          # Make sure the secrets match the names here
+          OFFICE365_CREDS_USR: ${{ secrets.OFFICE365_CREDS_USR }}
+          OFFICE365_CREDS_PSW: ${{ secrets.OFFICE365_CREDS_PSW }}
+          
+        # To run multiple commands within one shell, use the | character on first line then commands go on the lines below
+        # The variables Scriptname and Functionspath are required for the Initialize-RunnerEnvironment function, save them to the repository variables
+        run: |
+          . ${{ github.workspace }}\Initialize-RunnerEnvironment.ps1
+          & Initialize-RunnerEnvironment -ScriptName "${{ vars.ScriptName }}" -Functionspath "${{ vars.FUNCTIONSPATH }}" -RunScript
+      
+        # Last step is to upload any artifacts in the folder to an artifacts zip file in the workflow run summary
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          path: "${{ github.workspace }}\\artifacts\\*"
+          if-no-files-found: warn
