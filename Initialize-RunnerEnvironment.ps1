@@ -7,7 +7,7 @@ Function Initialize-RunnerEnvironment {
         [ValidatePattern('\.ps1$')]
         [string]$ScriptName,
         
-        [Parameter(Mandatory = $true, Position = 1, HelpMessage = "Path to the functions folder")]
+        [Parameter(Mandatory = $false, Position = 1, HelpMessage = "Path to the functions folder")]
         [ValidateNotNullOrEmpty()]
         [ValidateScript({ Test-Path -Path $_ -PathType Container })]
         [string]$FunctionsPath,
@@ -216,19 +216,31 @@ Function Initialize-RunnerEnvironment {
             #region Functions
             Write-Host "Loading Functions"
             # Check if functions path exists in global scope
-            ## If the functions path is empty, just a space, or null, test that each function is loaded.
-            $FunctionFiles = Get-ChildItem -Path $FunctionsPath -Filter *.ps* -Recurse -ErrorAction 'Stop' | Where-Object { $_.name -NotLike '*.Tests.ps1' }
-            # Check all imported functions in the function: powershell drive
-            $ImportedFunctions = Get-Item -Path function:
-            # If there are functions not imported, import them
-            ForEach ($Function in $FunctionFiles) {
-                if ($ImportedFunctions -notcontains $Function.BaseName) {
-                    . $Function.FullName
-                    #   $PSFMessage = "Loaded function:  {0}." -f $Function.FullName
-                    #   Write-Debug -Message $PSFMessage
+            If (-not [string]::IsNullOrWhiteSpace($FunctionsPath)) {
+                # Check if the functions path exists
+                If (Test-Path -Path $FunctionsPath) {
+                    $FunctionFiles = Get-ChildItem -Path $FunctionsPath -Filter *.ps* -Recurse -ErrorAction 'Stop' | Where-Object { $_.name -NotLike '*.Tests.ps1' }
+                    # Check all imported functions in the function: powershell drive
+                    $ImportedFunctions = Get-Item -Path function:
+                    # If there are functions not imported, import them
+                    ForEach ($Function in $FunctionFiles) {
+                        if ($ImportedFunctions -notcontains $Function.BaseName) {
+                            . $Function.FullName
+                            $PSFMessage = "Loaded function:  {0}." -f $Function.FullName
+                            Write-Debug -Message $PSFMessage
+                        }
+                    }
+                    Write-Debug -Message "Functions Loaded."
+                }
+                # If the functions path does not exist, throw an error
+                Else {
+                    Throw "Functions path not found at $FunctionsPath"
                 }
             }
-            Write-Debug -Message "Functions Loaded."
+            # If the functions path is empty or not initialized, skip loading functions and log a warning
+            Else {
+                Write-Warning -Message "No functions path provided, skipping function loading."
+            }
             
             #endregion Functions
         
@@ -417,7 +429,8 @@ Function Initialize-RunnerEnvironment {
             #Get the environment variables "parameters" that match the pattern "var[1-7]"
             $Parameters = get-childitem env: | Where-Object { $_.name -match "var[1-7]" }
 
-            ForEach ($Parameter in $Parameters) { # Loop through the parameters
+            ForEach ($Parameter in $Parameters) {
+                # Loop through the parameters
                 Write-Host "Processing parameter $($Parameter.Name) - $($Parameter.Value)"
                 # Find the corresponding value for the parameter by replacing "var" with "value"
                 $ValueEnv = $Parameter.Name -replace "Var", "Value"
