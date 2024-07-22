@@ -14,15 +14,15 @@ The RequiredModules list looks like this (uses nuget version range syntax, and n
 #>
 @{  
     #"PowerShellGet"    = "2.2.5"
-    "ServiceNow"    = "3.0"
+    #"ServiceNow"    = "3.0"
     #"PSFramework"    = "1.10.318"
     #"PnP.PowerShell" = "1.12.0"
     #"ExchangeOnlineManagement" = "3.2.0"
     #"Az.Accounts" = "3.0.0"
-    "Microsoft.Graph.Mail" = "2.19.0"
-    "Microsoft.Graph.Users" = "2.19.0"
-    "Microsoft.Graph.DirectoryObjects" = "2.19.0"
-    "Microsoft.Graph.Authentication" = "2.19.0"
-    "Microsoft.Graph.Groups" = "2.19.0"
+    #"Microsoft.Graph.Mail" = "2.19.0"
+    #"Microsoft.Graph.Users" = "2.19.0"
+    #"Microsoft.Graph.DirectoryObjects" = "2.19.0"
+    #"Microsoft.Graph.Authentication" = "2.19.0"
+    #"Microsoft.Graph.Groups" = "2.19.0"
     
 }
