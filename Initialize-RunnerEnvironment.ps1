@@ -72,8 +72,8 @@ Function Initialize-RunnerEnvironment {
             }
             ## If not running in github, set variables for local testing, these are fake values and can be changed to any value for testing.
             Else {
-                # Workspace here is set to the profile folder path for the user, but can be set to any folder for testing
-                $Global:Workspace = $(Split-path $profile)
+                # Workspace here is set to current folder, but can be set to any folder for testing
+                $Global:Workspace = Get-Location
                 # Runner name is the testing computer name
                 $Global:RunnerName = "$env:COMPUTERNAME"
                 # Run number is the date of the run, this would otherwise be a simple integer sent from gha
