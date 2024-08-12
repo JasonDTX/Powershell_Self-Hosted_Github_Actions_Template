@@ -1,8 +1,7 @@
-name: Run-PowerShell-Script
+name: Run-PowerShell-Script # NAME OF THE WORKFLOW
 on:
-  #schedule:
-    # Cron expression for every 24 hours at 4:00 AM
-     #- cron: '0 4 * * *'
+  schedule: # SCHEDULED TRIGGER
+    - cron: "30 12 31 OCT THU" # EXAMPLE: AT 12:30 ON DAY-OF-MONTH 31 AND ON THURSDAY IN OCTOBER, CAN ALSO BE EXPRESSED AS "30 12 31 10 04". HTTPS://CRONTAB.GURU/ FOR MORE INFO
   workflow_dispatch: # MANUAL TRIGGER
     inputs: # INPUTS FOR MANUAL TRIGGER
       INPUT1: # NAME OF INPUT
@@ -10,7 +9,7 @@ on:
           THIS IS AN INPUT DESCRIPTION
         required: true # OR FALSE
         type: choice # OR STRING, BOOLEAN, NUMBER
-        default: 'Add' # DEFAULT WILL AUTOFILL THE CHOICE - IS OPTIONAL
+        default: "Add" # DEFAULT WILL AUTOFILL THE CHOICE - IS OPTIONAL
         options:
           - OPTION1
           - OPTION2 # ADD MORE OPTIONS AS NEEDED
@@ -27,11 +26,18 @@ defaults:
 jobs:
   PowerShell-Script:
     runs-on: [self-hosted, X64, Windows] # FOR INTERNAL JOBS MUST USE SELF-HOSTED TO BE IN CORRECT ENVIRONMENT
-    
+
     steps:
       - name: Check out repository # CHECKS OUT THE REPOSITORY
         uses: actions/checkout@v4
-      
+
+      - name: Restore-Cache-Folder # OPTIONAL CACHE FILE OR FOLDER RESTORE
+        id: restore-cachefiles
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}\cache # PATH TO CACHE FOLDER OR FILE
+          key: cache-hash-a-${{ hashFiles('cache\cache-do-not-delete.txt') }} # HASH OF UNIQUE FILE IDENTIFIES THE CACHE NAME - THE HIGHEST HASH ID WILL BE USED
+
       - name: Execute custom Powershell script # RUNS THE POWERSHELL SCRIPT
         env: # INITIALIZER FUNCTION SUPPORTS UP TO SEVEN PARAMETER INPUTS
           Var1: "INPUT1" # These are simple example inputs. In some scripts you will not need these at all or only a few
@@ -54,13 +60,20 @@ jobs:
           # Make sure the secrets match the names here
           OFFICE365_CREDS_USR: ${{ secrets.OFFICE365_CREDS_USR }}
           OFFICE365_CREDS_PSW: ${{ secrets.OFFICE365_CREDS_PSW }}
-          
+
         # To run multiple commands within one shell, use the | character on first line then commands go on the lines below
         # The variables Scriptname and Functionspath are required for the Initialize-RunnerEnvironment function, save them to the repository variables
         run: |
           . ${{ github.workspace }}\Initialize-RunnerEnvironment.ps1
           & Initialize-RunnerEnvironment -ScriptName "${{ vars.ScriptName }}" -Functionspath "${{ vars.FUNCTIONSPATH }}" -RunScript
-      
+
+      - name: Save-Cache-Folder # OPTIONAL CACHE FILE OR FOLDER SAVE
+        id: save-reports
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}\cache # PATH TO CACHE FOLDER OR FILE
+          key: cache-hash-a-${{ hashFiles('reports\cache-do-not-delete.txt') }} # HASH OF UNIQUE FILE IDENTIFIES THE CACHE NAME - IF FILE IS CHANGED, CACHE WILL BE REBUILT
+
         # Last step is to upload any artifacts in the folder to an artifacts zip file in the workflow run summary
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

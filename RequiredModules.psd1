@@ -15,7 +15,7 @@ The RequiredModules list looks like this (uses nuget version range syntax, and n
 @{  
     #"PowerShellGet"    = "2.2.5"
     #"ServiceNow"    = "3.0"
-    #"PSFramework"    = "1.10.318"
+    "PSFramework"    = "1.10.318"
     #"PnP.PowerShell" = "1.12.0"
     #"ExchangeOnlineManagement" = "3.2.0"
     #"Az.Accounts" = "3.0.0"
