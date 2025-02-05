@@ -15,17 +15,21 @@
         'BodyAsHTML'  = $True
         'ErrorAction' = 'Stop'
     }
-    'ServiceNow'        = @{ # ServiceNow configuration for incidents, email used as failover
-        'URL'                    = ' ' # ServiceNow URL
-        'Incident'               = @{
-            # Utilizes New-ServiceNowIncident function which uses common parameter names including CustomFields which uses ServiceNow property names
-            'AssignmentGroup'   = ' ' # Service now assignment group for incident
-            'Caller'            = ' ' # Account name of the user who reported the incident
-            'Category'          = ' ' # ServiceNow category for incident
-            'Description'       = ' ' # Description of the incident
-            'ShortDescription'  = 'Powershell Job Failure'
-        }
-        'IncidentOverride'       = @{} # Optional override for New-ServiceNowIncident function, similar to servicenow configuration above
-        'ServiceRequestOverride' = @{} # Optional override for New-ServiceNowServiceRequest function, similar to servicenow configuration above
+    'ManageEngine' = @{
+        'clientScope'     = 'SDPOnDemand.requests.ALL' # Required scope for 'request' operations, customize as needed
+        'oauthUrl'        = 'https://accounts.zoho.com/oauth/v2/token' # OAuth URL
+        'manageengineUri' = 'https://sdpondemand.manageengine.com/app/itdesk/api/v3/requests' # ManageEngine request URL
+        'requester'       = ' ' # Requester email
+        'category'        = ' ' # Request category
+        'impact'          = 'Low' # Request impact
+        'subcategory'     = ' ' # Request subcategory
+        'urgency'         = 'Medium' # Request urgency
+        'priority'        = ' ' # Request priority
+        'Status'          = 'Open' # Request status
+        'group'           = ' ' # Request assignment group
+        'requesttype'     = 'Incident' # Request type
+        'technician'      = ' ' # Request assignment technician
+        'subject'         = 'GitHub Workflow Notification' # Request subject, this is appended to the incident subject
+        'description'     = "A critical error was encountered during processing:  " # Request description, this prepends the incident description
     }
 }

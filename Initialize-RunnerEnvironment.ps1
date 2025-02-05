@@ -171,16 +171,6 @@ Function Initialize-RunnerEnvironment {
                 Throw "Config file not found at $ConfigPath"
             }
 
-            ## Since the config file cannot accept dynamic values, the below section creates a dynamic body for the email message and service now tickets.
-            If ($Config.MessageParameters.Body -and $ServerURL -and $Repository -and $RunID) {
-                $DynamicBody = "The process was executed via a Github Workflow that may be found at {0}.<br><br>" -f "$ServerURL/$Repository/actions/runs/$RunID"
-                $Config.MessageParameters.Body = $DynamicBody + $Config.MessageParameters.Body
-                # Note that body variables for use in API calls, MUST be on a new line, be the first and only characters in the line, and must be the last line in the body.
-                $Config.ServiceNow.Description = @"
-                The process is executed via the script $PSCommandPath on $Env:ComputerName.`r
-                A critical error was encountered during processing:`n
-"@
-            }
             #endregion Config
 
             #region Credentials
@@ -188,13 +178,6 @@ Function Initialize-RunnerEnvironment {
             ## Next section creates global credential variables depending on access to the github secrets.
             #   Write-Debug -Message "Creating logon secrets"
 
-            # If Sevice Now secrets availble use them, else use test credentials
-            If ($Env:SERVICENOW_CREDS_USR -and $Env:SERVICENOW_CREDS_PSW) {
-                $Global:SNowCredential = New-Object System.Management.Automation.PSCredential ($Env:SERVICENOW_CREDS_USR, (ConvertTo-SecureString $Env:SERVICENOW_CREDS_PSW -AsPlainText -Force))
-            }
-            ElseIf ($Config.SnowUsername -and $Config.SnowPassword) {
-                $Global:SNowCredential = New-Object System.Management.Automation.PSCredential ("$Config.SnowUsername", (ConvertTo-SecureString "$Config.SnowPassword" -AsPlainText -Force))
-            }
             # If AD Service Account secrets availble use them, else use config file credentials (remove secrets from config file after testing)
             If ($Env:AD_SERVICE_ACCOUNT_USERNAME -and $Env:AD_SERVICE_ACCOUNT_PASSWORD) {
                 $Global:ADCredential = New-Object System.Management.Automation.PSCredential ($Env:AD_SERVICE_ACCOUNT_USERNAME, (ConvertTo-SecureString $Env:AD_SERVICE_ACCOUNT_PASSWORD -AsPlainText -Force))

@@ -35,7 +35,8 @@ Begin {
         # Script template calls a config psd1 file with the same name as the script.  If the config is not loaded, load it here.
         # Using a configuration psd1 avoids hardcoding values in the script and allows for easy configuration changes.
 
-        If (-Not $Config) { # If using the Initialize-RunnerEnvironment function, config is passed in as global variable
+        If (-Not $Config) {
+            # If using the Initialize-RunnerEnvironment function, config is passed in as global variable
 
             # The scriptname is required to load the configuration.
             # If the script name is not set, try to use the name of the script that is running
@@ -43,7 +44,8 @@ Begin {
                 Write-Debug "ScriptName is null or empty.  Attempting to set the ScriptName from the script that is running."
                 
                 # Attempt to set the script name from the script that is running
-                If ( -Not [string]::IsNullOrEmpty($MyInvocation.MyCommand.Name)) { # The invocation command name may not be available in all scenarios
+                If ( -Not [string]::IsNullOrEmpty($MyInvocation.MyCommand.Name)) {
+                    # The invocation command name may not be available in all scenarios
                     $Global:ScriptName = $MyInvocation.MyCommand.Name
                 }
             }
@@ -109,47 +111,51 @@ End {
     #region ERRORHANDLING
     Try {
         If ($ErrorCount -gt 0) {
-            # If errors are logged, throw an error with the count
             $ThrowMessage = "A total of [{0}] errors were logged.  Please view logs for details." -f $ErrorCount
             Throw $ThrowMessage
         }
     }
     Catch {
-        # Catch the throw above and create an incident
         $PSItem
-        ## Create ServiceNow ticket with error variables
-        $Config.ServiceNow.Incident.Description += $PSItem.Exception.Message
+        ## Create ManageEngine ticket with error variables
+        # Update subject line of ticket
+        $Config.ManageEngine.Subject = "$($scriptName) - $($Config.ManageEngine.Subject)"
+
+        $Config.ManageEngine.Description += $PSItem.Exception.Message
+        $Config.ManageEngine.Description += "<br>The process is executed via the script $($scriptName) on $($Env:ComputerName).<br> Error and Github Workflow run details can be found at {0}.<br>" -f "$serverUrl/$repository/actions/runs/$runId"
+        If ($Env:ManageEngineClientID) {
+            $Config.ManageEngine.ClientID = $Env:ManageEngineClientID
+        }
+        If ($Env:ManageEngineClientSecret) {
+            $Config.ManageEngine.ClientSecret = $Env:ManageEngineClientSecret
+        }
+        If ($null -eq $Config.ManageEngine.ClientID -or $null -eq $Config.ManageEngine.ClientSecret) {
+            Write-PSFMessage -Level Error -Message "ManageEngine ClientID or ClientSecret not found in configuration"
+            Throw "ManageEngine ClientID or ClientSecret not found in configuration"
+        }
+		
+        ### Get the PSFramework logging logfile configuration and make it a path to attach the log to ManageEngine
+        $LogPath = Get-PSFConfigValue -FullName 'PSFramework.Logging.LogFile.FilePath'
+        $LogName = Get-PSFConfigValue -FullName 'PSFramework.Logging.LogFile.LogName'
+        $LogFilePath = $LogPath.Replace('%logname%', $LogName)
+
+        $invokeManageEngineRequest = @{
+            Config          = $Config.ManageEngine
+            ClientID        = $Config.ManageEngine.ClientID
+            ClientSecret    = $Config.ManageEngine.ClientSecret
+            Scope           = $Config.ManageEngine.ClientScope
+            OAuthUrl        = $Config.ManageEngine.OAuthUrl
+            ManageEngineUri = $Config.ManageEngine.ManageEngineUri
+            ErrorAction     = 'Stop'
+        }
+        ### Attach log file if it exists
+        If (Test-Path $LogFilePath) {
+            Copy-Item -Path $LogFilePath -Destination "Incident.$($LogFilePath)"
+            $invokeManageEngineRequest.AttachmentPath = "Incident.$($LogFilePath)"
+        }
         Try {
-            If ($SNowCredential){
-                $invokeServiceNowIncidentSplat = @{
-                    Config      = $Config
-                    Credential  = $SNowCredential
-                    PassThru    = $true
-                    ErrorAction = 'Stop'
-                    Verbose     = $false
-                }
-                $Ticket = Invoke-ServiceNowIncident @invokeServiceNowIncidentSplat
-    
-                ### Get the PSFramework logging logfile configuration and make it a path to attach the log to ServiceNow
-                $LogPath = Get-PSFConfigValue -FullName 'PSFramework.Logging.LogFile.FilePath'
-                $LogName = Get-PSFConfigValue -FullName 'PSFramework.Logging.LogFile.LogName'
-                $LogFilePath = $LogPath.Replace('%logname%', $LogName)
-    
-                ### Attach log file if it exists
-                If (Test-Path $LogFilePath) {
-                    Set-PSFLoggingProvider -Name Logfile -Enabled $false
-                    $addServiceNowAttachmentSplat = @{
-                        ID          = $Ticket.Number
-                        Table       = 'incident'
-                        File        = $LogFilePath
-                        Verbose     = $false
-                        ErrorAction = 'Stop'
-                    }
-                    Add-ServiceNowAttachment @addServiceNowAttachmentSplat
-                    Set-PSFLoggingProvider -Name Logfile -Enabled $true
-                }
-            }
-            Else { $EmailFailover = $True }
+            Write-PSFMessage -Message "Creating ManageEngine Ticket"
+            Invoke-ManageEngineRequest @invokeManageEngineRequest
         }
         Catch {
             $PSItem
@@ -163,14 +169,19 @@ End {
             Try {
                 $MessageParameters = $Config.MessageParameters
                 Send-MailMessage @MessageParameters
-                Write-Verbose 'Email notification sent'
+                Write-PSFMessage 'Email notification sent'
             }
             Catch {
                 Write-Error $PSItem
             }
         }
+        If ($ErrorCount -gt 0) {
+            $ErrorMessage = "A total of [{0}] errors were logged.  Please view logs for details." -f $ErrorCount
+            Write-PSFMessage -Level Error -Message $ErrorMessage
+            Exit 1
+        }
     }
-    #endregion ERRORHANDLING 
+    #endregion ERRORHANDLING
     # Don't forget to close the region
 
     # You can put any other final code here

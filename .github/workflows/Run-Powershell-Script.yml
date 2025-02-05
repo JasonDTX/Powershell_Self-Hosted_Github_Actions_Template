@@ -55,8 +55,8 @@ jobs:
           Var7: "INPUT7"
           Value7: ${{ github.event.inputs.INPUT7 }}
           # Credentials are required for almost all scripts, set these in the github repository secrets
-          SERVICENOW_CREDS_USR: ${{ secrets.SERVICENOW_CREDS_USR }}
-          SERVICENOW_CREDS_PSW: ${{ secrets.SERVICENOW_CREDS_PSW }}
+          ManageEngineClientID: ${{ secrets.ManageEngineClientID }}
+          ManageEngineClientSecret: ${{ secrets.ManageEngineClientSecret }}
           # Make sure the secrets match the names here
           OFFICE365_CREDS_USR: ${{ secrets.OFFICE365_CREDS_USR }}
           OFFICE365_CREDS_PSW: ${{ secrets.OFFICE365_CREDS_PSW }}
