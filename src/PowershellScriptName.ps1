@@ -116,44 +116,60 @@ End {
         }
     }
     Catch {
-        $PSItem
-        ## Create ManageEngine ticket with error variables
-        # Update subject line of ticket
-        $Config.ManageEngine.Subject = "$($scriptName) - $($Config.ManageEngine.Subject)"
-
-        $Config.ManageEngine.Description += $PSItem.Exception.Message
-        $Config.ManageEngine.Description += "<br>The process is executed via the script $($scriptName) on $($Env:ComputerName).<br> Error and Github Workflow run details can be found at {0}.<br>" -f "$serverUrl/$repository/actions/runs/$runId"
-        If ($Env:ManageEngineClientID) {
-            $Config.ManageEngine.ClientID = $Env:ManageEngineClientID
-        }
-        If ($Env:ManageEngineClientSecret) {
-            $Config.ManageEngine.ClientSecret = $Env:ManageEngineClientSecret
-        }
-        If ($null -eq $Config.ManageEngine.ClientID -or $null -eq $Config.ManageEngine.ClientSecret) {
-            Write-PSFMessage -Level Error -Message "ManageEngine ClientID or ClientSecret not found in configuration"
-            Throw "ManageEngine ClientID or ClientSecret not found in configuration"
-        }
-		
-        ### Get the PSFramework logging logfile configuration and make it a path to attach the log to ManageEngine
-        $LogPath = Get-PSFConfigValue -FullName 'PSFramework.Logging.LogFile.FilePath'
-        $LogName = Get-PSFConfigValue -FullName 'PSFramework.Logging.LogFile.LogName'
-        $LogFilePath = $LogPath.Replace('%logname%', $LogName)
-
-        $invokeManageEngineRequest = @{
-            Config          = $Config.ManageEngine
-            ClientID        = $Config.ManageEngine.ClientID
-            ClientSecret    = $Config.ManageEngine.ClientSecret
-            Scope           = $Config.ManageEngine.ClientScope
-            OAuthUrl        = $Config.ManageEngine.OAuthUrl
-            ManageEngineUri = $Config.ManageEngine.ManageEngineUri
-            ErrorAction     = 'Stop'
-        }
-        ### Attach log file if it exists
-        If (Test-Path $LogFilePath) {
-            Copy-Item -Path $LogFilePath -Destination "Incident.$($LogFilePath)"
-            $invokeManageEngineRequest.AttachmentPath = "Incident.$($LogFilePath)"
-        }
         Try {
+            Write-PSFMessage "Opening Service-Desk request"
+            $PSItem
+            ## Create ManageEngine ticket with error variables
+            # Update subject line of ticket
+            If ($null -eq $scriptname -or $scriptname -notlike "*.ps1") {
+                If ( $null -ne $BuildScript) { $scriptName = $BuildScript }
+                ElseIf ($null -ne $env:scriptname) { $scriptName = $env:scriptName }
+                Else { $scriptname -eq "$($PSItem.InvocationInfo.ScriptName)" }
+            }
+            If ($Config.ManageEngine.Subject -ne "$($scriptName) - $($Config.ManageEngine.Subject)") {
+                $Config.ManageEngine.Subject = "$($scriptName) - $($Config.ManageEngine.Subject)"
+            }
+
+            Write-PSFMessage -Message "ManageEngine Subject: $($Config.ManageEngine.Subject)"
+
+            $Config.ManageEngine.Description += $PSItem.Exception.Message
+            $Config.ManageEngine.Description += "<br>The process is executed via the script $($scriptName) on $($Env:ComputerName).<br> Error and Github Workflow run details can be found at {0}.<br>" -f "$serverUrl/$repository/actions/runs/$runId"
+            If ($Env:ManageEngineClientID) {
+                $Config.ManageEngine.ClientID = $Env:ManageEngineClientID
+            }
+            If ($Env:ManageEngineClientSecret) {
+                $Config.ManageEngine.ClientSecret = $Env:ManageEngineClientSecret
+            }
+            If ($null -eq $Config.ManageEngine.ClientID -or $null -eq $Config.ManageEngine.ClientSecret) {
+                Write-PSFMessage -Level Error -Message "ManageEngine ClientID or ClientSecret not found in configuration"
+                Throw "ManageEngine ClientID or ClientSecret not found in configuration"
+            }
+		
+            ### Get the PSFramework logging logfile configuration and make it a path to attach the log to ManageEngine
+            $LogPath = Get-PSFConfigValue -FullName 'PSFramework.Logging.LogFile.FilePath'
+            $LogName = Get-PSFConfigValue -FullName 'PSFramework.Logging.LogFile.LogName'
+            $LogFilePath = $LogPath.Replace('%logname%', $LogName)
+
+            Write-PSFMessage "Configuration contents: $($Config.ManageEngine | Out-String)"
+
+            $invokeManageEngineRequest = @{
+                Config          = $Config.ManageEngine
+                ClientID        = $Config.ManageEngine.ClientID
+                ClientSecret    = $Config.ManageEngine.ClientSecret
+                Scope           = $Config.ManageEngine.ClientScope
+                OAuthUrl        = $Config.ManageEngine.OAuthUrl
+                ManageEngineUri = $Config.ManageEngine.ManageEngineUri
+                ErrorAction     = 'Stop'
+                verbose         = $true
+            }
+            ### Attach log file if it exists
+            If ([string]::IsNullOrEmpty($LogFilePath) -eq $false) {
+                If (Test-Path $LogFilePath) {
+                    $LogCopyName = $LogFilePath.Replace('.csv', ".Incident.log")
+                    Copy-Item -Path $LogFilePath -Destination "$($LogCopyName)"
+                    $invokeManageEngineRequest.AttachmentPath = "$($LogCopyName)"
+                }
+            }
             Write-PSFMessage -Message "Creating ManageEngine Ticket"
             Invoke-ManageEngineRequest @invokeManageEngineRequest
         }
@@ -162,6 +178,7 @@ End {
             ### Trigger an email failover if incident creation fails
             $EmailFailover = $True
         }
+        
     }
     Finally {
         ## Handle email notification as a failover if necessary.
