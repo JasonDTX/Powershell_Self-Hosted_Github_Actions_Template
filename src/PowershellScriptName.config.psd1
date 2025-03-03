@@ -16,6 +16,7 @@
         'ErrorAction' = 'Stop'
     }
     'ManageEngine' = @{
+        'successRequester' = '' # requester to use when automation suceeds
         'clientScope'     = 'SDPOnDemand.requests.ALL' # Required scope for 'request' operations, customize as needed
         'oauthUrl'        = 'https://accounts.zoho.com/oauth/v2/token' # OAuth URL
         'manageengineUri' = 'https://sdpondemand.manageengine.com/app/itdesk/api/v3/requests' # ManageEngine request URL
