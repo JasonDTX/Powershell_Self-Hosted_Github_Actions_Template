@@ -43,17 +43,17 @@ function global:Invoke-ManageEngineRequest {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $false)]
-        [string]$AttachmentPath,
+        [array]$AttachmentPath,
         [Parameter(Mandatory = $true)]
         [ValidateScript({
-            Try {
-                $null = $_.subject.Clone()
-                $True
-            }
-            Catch {
-                Throw 'Expected config key: subject.  Confirm the config is properly formatted.'
-            }
-        })]
+                Try {
+                    $null = $_.subject.Clone()
+                    $True
+                }
+                Catch {
+                    Throw 'Expected config key: subject.  Confirm the config is properly formatted.'
+                }
+            })]
         [ValidateNotNullOrEmpty()]
         [hashtable]$Config,
         [Parameter(Mandatory = $true)]
@@ -167,24 +167,27 @@ function global:Invoke-ManageEngineRequest {
         }
         #Create the input data for the API call
         $input_data = @{
-            "request" = @{
-                "requester"    = @{ "email_id" = "$($sdpConfig.Requester)" }
-                "category"     = @{ "name" = "$($sdpConfig.Category)" }
-                "impact"       = @{ "name" = "$($sdpConfig.Impact)" }
-                "subcategory"  = @{ "name" = "$($sdpConfig.SubCategory)" }
-                "urgency"      = @{ "name" = "$($sdpConfig.Urgency)" }
-                "priority"     = @{ "name" = "$($sdpConfig.Priority)" }
-                "status"       = @{ "name" = "$($sdpConfig.Status)" }
-                "group"        = @{ "name" = "$($sdpConfig.Group)" }
-                "request_type" = @{ "name" = "$($sdpConfig.RequestType)" }
-                "technician"   = @{ "email_id" = "$($sdpConfig.Technician)" }
-                "subject"      = "$($sdpConfig.Subject)"
-                "description"  = "$($sdpConfig.Description)"
+            request = @{
+                requester    = @{ email_id = $sdpConfig.Requester }
+                subject      = $($sdpConfig.Subject)
             }
         }
+        Switch ($sdpConfig){
+            { $_.Category } { $input_data.request.category = @{ name = $sdpConfig.Category } }
+            { $_.Impact }    { $input_data.request.impact = @{ name = $sdpConfig.Impact } }
+            { $_.SubCategory } { $input_data.request.subcategory = @{ name = $sdpConfig.SubCategory } }
+            { $_.Urgency }   { $input_data.request.urgency = @{ name = $sdpConfig.Urgency } }
+            { $_.Priority }  { $input_data.request.priority = @{ name = $sdpConfig.Priority } }
+            { $_.Status }    { $input_data.request.status = @{ name = $sdpConfig.Status } }
+            { $_.Group }     { $input_data.request.group = @{ name = $sdpConfig.Group } }
+            { $_.RequestType } { $input_data.request.request_type = @{ name = $sdpConfig.RequestType } }
+            { $_.Technician }  { $input_data.request.technician = @{ email_id = $sdpConfig.Technician } }
+            { $_.Description } { $input_data.request.description = $($sdpConfig.Description) }
+        }
+
         #Convert the input data to JSON for REST
         $input_data = $input_data | ConvertTo-Json
-        $data = @{ 'input_data' = $input_data }
+        $data = @{ input_data = $input_data }
         #endregion INCIDENTHEADERS
 
         #region INCIDENT
@@ -195,44 +198,50 @@ function global:Invoke-ManageEngineRequest {
             Headers = $headers
             Body    = $data
         }
+        If (Test-Path "..\artifacts") {
+            Write-Debug "Saving ticket body"
+            Out-File -InputObject $IncidentSplat.Body -FilePath "..\artifacts\TicketBody.json"
+        }
         $ticketResponse = Invoke-RestMethod @IncidentSplat
         #endregion INCIDENT
 
-        #region ATTACH_HEADERS
-        Write-Debug "Uploading Attachment"
-        #If an attachment path is provided, upload the file to the ticket
-        #This code provided by https://www.manageengine.com/products/service-desk/sdpod-v3-api/requests/request.html#add-attachment-to-a-request
-        $uploadUrl = "$($ManageEngineUri)/$($TicketResponse.request.id)/_uploads"
-        $filePath = "$AttachmentPath"
-        $addToAttachment = "true"
-        $boundary = [System.Guid]::NewGuid().ToString()
-        $headers = @{
-            "Accept"        = "application/vnd.manageengine.sdp.v3+json"
-            "Content-Type"  = "multipart/form-data; boundary=`"$boundary`""
-            "Authorization" = "Bearer $token"
-        }
-        $content = [System.Text.Encoding]::GetEncoding('iso-8859-1').GetString([System.IO.File]::ReadAllBytes($filePath))
-        $body = (
-            "--$boundary",
-            "Content-Disposition: form-data; name=`"addtoattachment`"`r`n",
-            "$addtoattachment",
-            "--$boundary",
-            "Content-Disposition: form-data; name=`"filename`"; filename=`"$(Split-Path $filePath -Leaf)`"",
-            "Content-Type: $([System.Web.MimeMapping]::GetMimeMapping($filePath))`r`n",
-            $content,
-            "--$boundary--`r`n"
-        ) -join "`r`n"
-        #endregion ATTACH_HEADERS
+        ForEach ($Attachment in $AttachmentPath) {
+            #region ATTACH_HEADERS
+            Write-Debug "Uploading Attachment $Attachment"
+            #If an attachment path is provided, upload the file to the ticket
+            #This code provided by https://www.manageengine.com/products/service-desk/sdpod-v3-api/requests/request.html#add-attachment-to-a-request
+            $uploadUrl = "$($ManageEngineUri)/$($TicketResponse.request.id)/_uploads"
+            $filePath = "$Attachment"
+            $addToAttachment = "true"
+            $boundary = [System.Guid]::NewGuid().ToString()
+            $headers = @{
+                "Accept"        = "application/vnd.manageengine.sdp.v3+json"
+                "Content-Type"  = "multipart/form-data; boundary=`"$boundary`""
+                "Authorization" = "Bearer $token"
+            }
+            $content = [System.Text.Encoding]::GetEncoding('iso-8859-1').GetString([System.IO.File]::ReadAllBytes($filePath))
+            $body = (
+                "--$boundary",
+                "Content-Disposition: form-data; name=`"addtoattachment`"`r`n",
+                "$addtoattachment",
+                "--$boundary",
+                "Content-Disposition: form-data; name=`"filename`"; filename=`"$(Split-Path $filePath -Leaf)`"",
+                "Content-Type: $([System.Web.MimeMapping]::GetMimeMapping($filePath))`r`n",
+                $content,
+                "--$boundary--`r`n"
+            ) -join "`r`n"
+            #endregion ATTACH_HEADERS
 
-        #region ATTACHMENT
-        $AttachmentSplat = @{
-            Uri     = $uploadUrl
-            Method  = 'POST'
-            Headers = $headers
-            Body    = $body
+            #region ATTACHMENT
+            $AttachmentSplat = @{
+                Uri     = $uploadUrl
+                Method  = 'POST'
+                Headers = $headers
+                Body    = $body
+            }
+            $attachmentResponse = Invoke-RestMethod @AttachmentSplat
+            #endregion ATTACHMENT
         }
-        $attachmentResponse = Invoke-RestMethod @AttachmentSplat
-        #endregion ATTACHMENT
     }
     End {
         $results = @{

@@ -110,8 +110,6 @@ End {
     # Use regions to separate code sections
     #region ERRORHANDLING
     Try {
-        $Attachments = @()
-
         # Make sure scriptname exists for creating ticket subject line
         If ($null -eq $scriptname -or $scriptname -notlike "*.ps1") {
             If ( $null -ne $BuildScript) { $scriptName = $BuildScript }
@@ -119,12 +117,9 @@ End {
             Else { $scriptname -eq "$($PSItem.InvocationInfo.ScriptName)" }
         }
         # Make sure the application ID and api secret are available
-        If ($Env:ManageEngineClientID) {
-            $Config.ManageEngine.ClientID = $Env:ManageEngineClientID
-        }
-        If ($Env:ManageEngineClientSecret) {
-            $Config.ManageEngine.ClientSecret = $Env:ManageEngineClientSecret
-        }
+        If ($Env:ManageEngineClientID) { $Config.ManageEngine.ClientID = $Env:ManageEngineClientID }
+        If ($Env:ManageEngineClientSecret) { $Config.ManageEngine.ClientSecret = $Env:ManageEngineClientSecret }
+        
         # If they are not available throw to email failover
         If ($null -eq $Config.ManageEngine.ClientID -or $null -eq $Config.ManageEngine.ClientSecret) {
             Write-PSFMessage -Level Error -Message "ManageEngine ClientID or ClientSecret not found in configuration"
@@ -138,59 +133,42 @@ End {
             OAuthUrl        = $Config.ManageEngine.OAuthUrl
             ManageEngineUri = $Config.ManageEngine.ManageEngineUri
         }
-        # Create the config array
         # If there are no errors, create a resolved service desk ticket to log the success
         If ($ErrorCount -eq 0) {
             Write-PSFMessage "Opening Success Service-Desk request"
-
-            ## Create ManageEngine ticket with success variables
-            $Config.ManageEngine.Subject = "AUTOMATION SUCEEDED - $($scriptName)"
-            $Config.ManageEngine.Description = "AUTOMATION SUCEEDED. <br>The process is executed via the script $($scriptName) on $($Env:ComputerName).<br> Logs and Github Workflow run details can be found at {0}.<br>" -f "$serverUrl/$repository/actions/runs/$runId"
-            $Config.ManageEngine.Requester = $Config.ManageEngine.successRequester
-            $Config.ManageEngine.impact = 'Low'
-            $Config.ManageEngine.urgency = 'Low'
-            $Config.ManageEngine.priority = 'P5. Low'
-            $Config.ManageEngine.Status = 'Closed'
-
-            Write-PSFMessage -Message "ManageEngine Subject: $($Config.ManageEngine.Subject)"
+            ## Create ManageEngine config with success variables
+            $Config.ManageEngine = $Config.ManageEngine.SuccessTicket
         }
         # If there are errors, create an open service desk ticket to Automation Team
         If ($ErrorCount -gt 0) {
             Write-PSFMessage "Opening Error Service-Desk request"
-
-            ## Create ManageEngine ticket with error variables
-            $Config.ManageEngine.Subject = "$($scriptName) - $($Config.ManageEngine.Subject)"
-            $ThrowMessage = "A total of [{0}] errors were logged.  Please view logs for details." -f $ErrorCount
-            $Config.ManageEngine.Description += $ThrowMessage
-            $Config.ManageEngine.Description += "<br>The process is executed via the script $($scriptName) on $($Env:ComputerName).<br> Error and Github Workflow run details can be found at {0}.<br>" -f "$serverUrl/$repository/actions/runs/$runId"
-            
-            Write-PSFMessage -Message "ManageEngine Subject: $($Config.ManageEngine.Subject)"
+            ## Create ManageEngine config with error variables
+            $Config.ManageEngine = $Config.ManageEngine.ErrorTicket
         }
         # Add the config to the splat
+        $Config.ManageEngine.Subject = "$($Config.ManageEngine.Subject) - $($scriptName)"
+        $Config.ManageEngine.Description = $Config.ManageEngine.Description -f $errorcount, $scriptName, $Env:ComputerName, "$serverUrl/$repository/actions/runs/$runId"
+        
+        # Add the config to the splat
         $invokeManageEngineRequest.Config = $Config.ManageEngine
-
-        # Get the PSFramework logging logfile configuration and make it a path to attach the log to ManageEngine
-        $LogPath = Get-PSFConfigValue -FullName 'PSFramework.Logging.LogFile.FilePath'
-        $LogName = Get-PSFConfigValue -FullName 'PSFramework.Logging.LogFile.LogName'
-        $LogFilePath = $LogPath.Replace('%logname%', $LogName)
-    
-        # Attach log file if it exists
-        If ([string]::IsNullOrEmpty($LogFilePath) -eq $false) {
-            If (Test-Path $LogFilePath) {
-                $LogCopyName = $LogFilePath.Replace('.csv', ".Incident.log")
-                Copy-Item -Path $LogFilePath -Destination $LogCopyName
-                $Attachments += $LogCopyName
+        
+        # Attach artifacts if exists
+        If (Test-Path $Artifacts) {
+            If (-Not (Test-Path "$Artifacts\IncidentLogs")) {
+                $null = New-Item -Path "$Artifacts\IncidentLogs" -ItemType Directory
+            }
+            $Attachments = Get-ChildItem -Path $Artifacts -File | ForEach-Object {
+                $FileNewPath = Join-Path -Path $Artifacts -ChildPath "IncidentLogs\$($_.Name)"
+                Copy-Item -Path $_.FullName -Destination $FileNewPath -Force
+                $FileNewPath
             }
         }
         # Add the attachments to the splat
         If ($null -ne $Attachments) {
             $invokeManageEngineRequest.AttachmentPath = $Attachments
-            Write-PSFMessage "Attachments included: $($Attachments | Out-String)"
         }
         # Create the ticket
-        Write-PSFMessage -Message "Creating ManageEngine Ticket"
-        Write-PSFMessage -Message "Invoke Splat: $($invokeManageEngineRequest | Out-String)"
-        Invoke-ManageEngineRequest @invokeManageEngineRequest
+        $null = Invoke-ManageEngineRequest @invokeManageEngineRequest
 
     }
     Catch {
@@ -198,24 +176,30 @@ End {
         ### Trigger an email failover if incident creation fails
         $EmailFailover = $True
     }
-    
     Finally {
         ## Handle email notification as a failover if necessary.
         If ($EmailFailover -eq $True) {
             Try {
                 $MessageParameters = $Config.MessageParameters
+                $MessageParameters.From = $MessageParameters.From -f $scriptName
+                $MessageParameters.Subject = $MessageParameters.Subject -f $scriptName
+                $MessageParameters.Body = $Config.MessageParameters.Body -f $errorcount, $scriptName, $Env:ComputerName, "$serverUrl/$repository/actions/runs/$runId"
                 Send-MailMessage @MessageParameters
                 Write-PSFMessage 'Email notification sent'
             }
             Catch {
+                $ErrorCount ++
                 Write-Error $PSItem
             }
         }
-        If ($ErrorCount -gt 0) {
-            $ErrorMessage = "A total of [{0}] errors were logged.  Please view logs for details." -f $ErrorCount
-            Write-PSFMessage -Level Error -Message $ErrorMessage
-            Exit 1
-        }
+    }    
+    If ($ErrorCount -eq 0) {
+        Exit 0
+    }
+    If ($ErrorCount -gt 0) {
+        $ErrorMessage = "A total of [{0}] errors were logged.  Please view logs for details." -f $ErrorCount
+        Write-PSFMessage -Level Error -Message $ErrorMessage
+        Exit 1
     }
     #endregion ERRORHANDLING
     # Don't forget to close the region

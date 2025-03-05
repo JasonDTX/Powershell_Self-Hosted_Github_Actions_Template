@@ -105,6 +105,9 @@ Function Initialize-RunnerEnvironment {
             Write-Host "Setting up Logging"
             ## Next section Saves a CSV logfile to the artifacts folder.
             If ($Workspace) {
+                If (-NOT (Test-Path -Path $Artifacts)) {
+                    $null = New-Item -Path $Artifacts -ItemType Directory -ErrorAction SilentlyContinue
+                }
                 ## Next section enables psframework logging provider "console".  This forces all logging to appear on screen in github actions display, unless specifically suppressed.
                 ## Note log display on github actions at time of writing is limited to 1500 lines.
 
@@ -199,15 +202,15 @@ Function Initialize-RunnerEnvironment {
             Write-Host "Loading Functions"
             # Check if functions path exists in global scope
             If (-not [string]::IsNullOrWhiteSpace($FunctionsPath)) {
-                # Check if the functions path exists
-                If (Test-Path -Path $FunctionsPath) {
+                # Check if the functions path exists and has PS1 files
+                If (Test-Path -Path $FunctionsPath -Filter *.ps*) {
                     $FunctionFiles = Get-ChildItem -Path $FunctionsPath -Filter *.ps* -Recurse -ErrorAction 'Stop' | Where-Object { $_.name -NotLike '*.Tests.ps1' }
                     # Check all imported functions in the function: powershell drive
                     $ImportedFunctions = Get-Item -Path function:
                     # If there are functions not imported, import them
                     ForEach ($Function in $FunctionFiles) {
                         if ($ImportedFunctions -notcontains $Function.BaseName) {
-                            . $Function.FullName
+                            Import-Module $Function.FullName
                             $PSFMessage = "Loaded function:  {0}." -f $Function.FullName
                             Write-Debug -Message $PSFMessage
                         }
@@ -216,7 +219,7 @@ Function Initialize-RunnerEnvironment {
                 }
                 # If the functions path does not exist, throw an error
                 Else {
-                    Throw "Functions path not found at $FunctionsPath"
+                    Write-PSFMessage -Level Warning "No functions found at $FunctionsPath"
                 }
             }
             # If the functions path is empty or not initialized, skip loading functions and log a warning
