@@ -183,21 +183,31 @@ Function Initialize-RunnerEnvironment {
 
             # If AD Service Account secrets availble use them, else use config file credentials (remove secrets from config file after testing)
             If ($Env:AD_SERVICE_ACCOUNT_USERNAME -and $Env:AD_SERVICE_ACCOUNT_PASSWORD) {
+                Write-Host "Using AD Service Account Secrets"
                 $Global:ADCredential = New-Object System.Management.Automation.PSCredential ($Env:AD_SERVICE_ACCOUNT_USERNAME, (ConvertTo-SecureString $Env:AD_SERVICE_ACCOUNT_PASSWORD -AsPlainText -Force))
+                Write-Debug -Message "Logon secrets created"
+
             }
             ElseIf ($Config.ADUsername -and $Config.ADPassword) {
+                Write-Host "Using AD Service Account Config"
                 $Global:ADCredential = New-Object System.Management.Automation.PSCredential ("$Config.ADUsername", (ConvertTo-SecureString "$Config.ADPassword" -AsPlainText -Force))
+                Write-Debug -Message "Logon secrets created"
+
             }
             # If Office 365 secrets availble use them, else use config file credentials (remove secrets from config file after testing)
             If ($Env:OFFICE365_CREDS_USR -and $Env:OFFICE365_CREDS_PSW) {
+                Write-Host "Using Office 365 Secrets"
                 $Global:Credential = New-Object System.Management.Automation.PSCredential ($Env:OFFICE365_CREDS_USR, (ConvertTo-SecureString $Env:OFFICE365_CREDS_PSW -AsPlainText -Force))
-                $Global:OfficeCredential = New-Object System.Management.Automation.PSCredential ("$Config.OfficeUsername", (ConvertTo-SecureString "$Config.OfficePassword" -AsPlainText -Force))
+                $Global:OfficeCredential = New-Object System.Management.Automation.PSCredential ($Env:OFFICE365_CREDS_USR, (ConvertTo-SecureString $Env:OFFICE365_CREDS_PSW -AsPlainText -Force))
+                Write-Debug -Message "Logon secrets created"
+
             }
             ElseIf ($Config.OfficeUsername -and $Config.OfficePassword) {
+                Write-Host "Using Office 365 Config"
                 $Global:Credential = New-Object System.Management.Automation.PSCredential ("$Config.OfficeUsername", (ConvertTo-SecureString "$Config.OfficePassword" -AsPlainText -Force))
                 $Global:OfficeCredential = New-Object System.Management.Automation.PSCredential ("$Config.OfficeUsername", (ConvertTo-SecureString "$Config.OfficePassword" -AsPlainText -Force))
+                Write-Debug -Message "Logon secrets created"
             }
-            Write-Debug -Message "Logon secrets created"
             #endregion Credentials
 
             #region Functions
