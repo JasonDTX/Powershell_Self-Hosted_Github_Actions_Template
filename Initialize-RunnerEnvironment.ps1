@@ -190,10 +190,10 @@ Function Initialize-RunnerEnvironment {
             }
             # If Office 365 secrets availble use them, else use config file credentials (remove secrets from config file after testing)
             If ($Env:OFFICE365_CREDS_USR -and $Env:OFFICE365_CREDS_PSW) {
-                $Global:OfficeCredential = New-Object System.Management.Automation.PSCredential ($Env:OFFICE365_CREDS_USR, (ConvertTo-SecureString $Env:OFFICE365_CREDS_PSW -AsPlainText -Force))
+                $Global:Credential = New-Object System.Management.Automation.PSCredential ($Env:OFFICE365_CREDS_USR, (ConvertTo-SecureString $Env:OFFICE365_CREDS_PSW -AsPlainText -Force))
             }
             ElseIf ($Config.OfficeUsername -and $Config.OfficePassword) {
-                $Global:OfficeCredential = New-Object System.Management.Automation.PSCredential ("$Config.OfficeUsername", (ConvertTo-SecureString "$Config.OfficePassword" -AsPlainText -Force))
+                $Global:Credential = New-Object System.Management.Automation.PSCredential ("$Config.OfficeUsername", (ConvertTo-SecureString "$Config.OfficePassword" -AsPlainText -Force))
             }
             Write-Debug -Message "Logon secrets created"
             #endregion Credentials
@@ -335,28 +335,6 @@ Function Initialize-RunnerEnvironment {
                             & Install-RequiredModule @InstallSplat | Out-Null
                         }
                         #endregion Modules Script
-                
-                        Write-Debug "Updating Manual Modules"
-                        #region Manual Modules
-                        # If a module is not found in System32 or Program Files, it may have been placed by a file synchronization or manual install.
-                        # This section will check for the module in the psgallery, and update the local module if an update is found.
-                        Get-Module -ListAvailable | # Get all modules
-                        Where-Object ModuleBase -notmatch "(system32|program files)" | # Filter out system modules
-                        Sort-Object -Property Name, Version -Descending | # Sort by name and version
-                        Get-Unique -PipelineVariable Module | # Get unique modules
-                        ForEach-Object {
-                            if ((Test-Path -Path "$($_.ModuleBase)\PSGetModuleInfo.xml")) {
-                                Find-Module -Repository PSGallery -Name $_.Name -OutVariable Repo -ErrorAction SilentlyContinue | # Find the module in the PSGallery
-                                Compare-Object -ReferenceObject $_ -Property Name, Version | # Compare the versions
-                                Where-Object SideIndicator -eq '=>' | # Find the newer version
-                                #Create new object with custom properties that will be used to install the module
-                                Select-Object -Property Name,
-                                Version,
-                                @{label = 'Repository'; expression = { $Repo.Repository } },
-                                @{label = 'InstalledVersion'; expression = { $Module.Version } }
-                            }
-                        } | ForEach-Object { Install-Module -Repository PSGallery -Name $_.Name -Force -SkipPublisherCheck -Scope CurrentUser } # Install the newer version of the module to current user profile.
-                        #endregion UpdateManualModules
 
                         #Export the date of this run so that the dependencies are not checked again for 30 days.
                         $Now | Export-Clixml -Path "$Env:ProgramData\InitDate_$($ScriptName).xml"
