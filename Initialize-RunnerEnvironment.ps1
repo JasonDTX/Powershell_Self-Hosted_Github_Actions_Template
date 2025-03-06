@@ -191,9 +191,11 @@ Function Initialize-RunnerEnvironment {
             # If Office 365 secrets availble use them, else use config file credentials (remove secrets from config file after testing)
             If ($Env:OFFICE365_CREDS_USR -and $Env:OFFICE365_CREDS_PSW) {
                 $Global:Credential = New-Object System.Management.Automation.PSCredential ($Env:OFFICE365_CREDS_USR, (ConvertTo-SecureString $Env:OFFICE365_CREDS_PSW -AsPlainText -Force))
+                $Global:OfficeCredential = New-Object System.Management.Automation.PSCredential ("$Config.OfficeUsername", (ConvertTo-SecureString "$Config.OfficePassword" -AsPlainText -Force))
             }
             ElseIf ($Config.OfficeUsername -and $Config.OfficePassword) {
                 $Global:Credential = New-Object System.Management.Automation.PSCredential ("$Config.OfficeUsername", (ConvertTo-SecureString "$Config.OfficePassword" -AsPlainText -Force))
+                $Global:OfficeCredential = New-Object System.Management.Automation.PSCredential ("$Config.OfficeUsername", (ConvertTo-SecureString "$Config.OfficePassword" -AsPlainText -Force))
             }
             Write-Debug -Message "Logon secrets created"
             #endregion Credentials
