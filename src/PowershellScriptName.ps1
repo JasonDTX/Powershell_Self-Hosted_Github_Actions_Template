@@ -153,12 +153,12 @@ End {
         $invokeManageEngineRequest.Config = $Config.ManageEngine
         
         # Attach artifacts if exists
-        If (Test-Path $Artifacts) {
-            If (-Not (Test-Path "$Artifacts\IncidentLogs")) {
-                $null = New-Item -Path "$Artifacts\IncidentLogs" -ItemType Directory
+        If (Test-Path "$Workspace\artifacts" -ErrorAction SilentlyContinue) {
+            If (-Not (Test-Path "$Workspace\artifacts\IncidentLogs" -ErrorAction SilentlyContinue)) {
+                $null = New-Item -Path "$Workspace\artifacts\IncidentLogs" -ItemType Directory
             }
-            $Attachments = Get-ChildItem -Path $Artifacts -File | ForEach-Object {
-                $FileNewPath = Join-Path -Path $Artifacts -ChildPath "IncidentLogs\$($_.Name)"
+            $Attachments = Get-ChildItem -Path "$Workspace\artifacts" -File | ForEach-Object {
+                $FileNewPath = Join-Path -Path "$Workspace\artifacts" -ChildPath "IncidentLogs\$($_.Name)"
                 Copy-Item -Path $_.FullName -Destination $FileNewPath -Force
                 $FileNewPath
             }
