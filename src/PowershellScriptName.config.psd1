@@ -22,9 +22,7 @@
         'ErrorTicket'     = @{
             'requester'   = '' # Requester email address
             'category'    = '' # Category
-            'impact'      = '' # Impact
             'subcategory' = '' # Subcategory
-            'urgency'     = '' # Urgency
             'priority'    = '' # Priority
             'Status'      = 'Open' # Status
             'group'       = ''    # Group
@@ -32,14 +30,12 @@
             'requesttype' = 'Incident' # Request type
             'subject'     = 'GitHub Workflow Notification' # Subject
             'description' = "A critical error was encountered during processing:<br><br>A total of [{0}] errors were logged.  Please view logs for details.<br>The process is executed via the script {1} on {2}.<br> Error and Github Workflow run details can be found at {3}.<br>" # Description
-            
+
         }
         'SuccessTicket'   = @{
             'Requester'       = '' # Requester email address
             'Category'        = '' # Category
-            'Impact'          = '' # Impact
             'Subcategory'     = '' # Subcategory
-            'Urgency'         = '' # Urgency
             'Priority'        = '' # Priority
             'Status'          = 'Closed' # Status
             'technician'      = '' # Technician email address
